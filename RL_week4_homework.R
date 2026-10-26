@@ -38,7 +38,12 @@ load("rs_data.RData")
 # Why did some of the artist-song fail to match up?
 
 #ANSWER
+rs_joined_orig <-  full_join(rs_old, rs_new, by = c("Artist","Song"))
+print(rs_joined_orig)
 
+nrow(rs_joined_orig)
+#860 rows
+#It seems like the merging might not be right because the ranking was in the differnet order (ascending vs decending?)
 
 
 ### Question 2 ---------- 
@@ -50,6 +55,13 @@ load("rs_data.RData")
 # Make Rank and Year into integer variables for rs_old before binding them into rs_all
 
 #ANSWER
+rs_old <- rs_old %>% mutate(Rank = as.integer(Rank), Year = as.integer(Year), Source = "Old")
+
+rs_new <- rs_new %>% mutate(Source = "New")
+
+rs_all <- bind_rows(rs_old, rs_new)
+
+print(rs_all)
 
 
 ### Question 3 ----------
