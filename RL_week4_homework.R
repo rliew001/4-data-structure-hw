@@ -74,6 +74,16 @@ print(rs_all)
 # Use both functions to make all artists/song lowercase and remove any extra spaces
 
 #ANSWER
+rs_all <- rs_all %>% mutate(across(c(Artist, Song), ~ str_remove_all(.,"The")))%>% mutate(across(c(Artist, Song),~str_replace_all(.,"&","and"))) %>% 
+  mutate(
+    across(c(Artist, Song), ~ str_remove_all(., "[[:punct:]]"))
+  ) %>%  mutate(
+    across(c(Artist, Song), ~ str_to_lower(.))
+  ) %>%
+  mutate(
+    across(c(Artist, Song), ~ str_trim(.))
+  )
+print(rs_all)
 
 
 ### Question 4 ----------
@@ -87,8 +97,17 @@ print(rs_all)
 # in the new rs_joined compared to the original. Use nrow to check (there should be 799 rows)
 
 #ANSWER
+rs_old_clean <- rs_all %>% filter(Source == "Old") %>% select(-Source)
 
+rs_new_clean <- rs_all %>% filter(Source == "New") %>% select(-Source)
 
+print(rs_old_clean)
+print(rs_new_clean)
+
+rs_joined <- full_join(rs_old_clean, rs_new_clean, by=c("Artist","Song"), suffix = c("_Old", "_New"))
+
+nrow(rs_joined)
+print(rs_joined)
 ### Question 5 ----------
 
 # Let's clean up rs_joined with the following steps:
@@ -100,7 +119,18 @@ print(rs_all)
 # You should now be able to see how each song moved up/down in rankings between the two lists
 
 #ANSWER
+rs_joined <- rs_joined %>%
+  select(-any_of("Source")) %>%
+  filter(
+    !is.na(Rank_Old),
+    !is.na(Rank_New)
+  ) %>%
+  mutate(
+    Rank_Change = Rank_Old - Rank_New
+  ) %>%
+  arrange(desc(Rank_Change))
 
+print(rs_joined)
 
 ### Question 6 ----------
 
@@ -111,7 +141,18 @@ print(rs_all)
 # Which decade improved the most?
 
 #ANSWER
+rs_joined <- rs_joined %>%
+  mutate(
+    round_year = round(Year_Old, digits = -1),
+    Decade = factor(paste0(round_year, "s"))
+  )
 
+rs_joined %>%
+  group_by(Decade) %>%
+  summarise(
+    Mean_Rank_Change = mean(Rank_Change, na.rm = TRUE)
+  )
+print(rs_joined)
 
 
 ### Question 7 ----------
@@ -123,6 +164,9 @@ print(rs_all)
 
 #ANSWER
 
+fct_count(rs_joined$Decade)
+decade_lumped <- fct_lump(rs_joined$Decade, n = 3)
+fct_count(decade_lumped, prop = TRUE)
 
 
 ### Question 8 ---------- 
@@ -132,6 +176,18 @@ print(rs_all)
 # Use parse_date_time to fix it
 
 #ANSWER
+top20 <- read_csv("top_20.csv")
+print(top20)
+
+top20 <- top20 %>%
+  mutate(
+    Release = parse_date_time(
+      Release,
+      orders = c("ymd", "mdy", "dmy", "ym", "my")
+    )
+  )
+
+print(top20)
 
 
 ### Question 9 --------
@@ -142,7 +198,12 @@ print(rs_all)
 
 #ANSWER
 
-
+top20 <- top20 %>%
+  pivot_wider(
+    names_from = Style,
+    values_from = Value
+  )
+print(top20)
 
 ### Question 10 ---------
 
@@ -155,7 +216,20 @@ print(rs_all)
 # Count the number of songs that were released in each season
 
 #ANSWER
+top20 <- left_join(top20, rs_joined, by = c("Artist", "Song"))
 
+top20 <- top20 %>%
+  mutate(
+    Month = month(Release, label = TRUE),
+    Season = case_when(
+      Month %in% c("Dec", "Jan", "Feb") ~ "Winter",
+      Month %in% c("Mar", "Apr", "May") ~ "Spring",
+      Month %in% c("Jun", "Jul", "Aug") ~ "Summer",
+      Month %in% c("Sep", "Oct", "Nov") ~ "Fall"
+    ),
+    Season = factor(Season)
+  )
+print(top20)
 
 
 ### Question 11 ---------
@@ -167,5 +241,30 @@ print(rs_all)
 
 #ANSWER
 
+top20 <- top20 %>%
+  mutate(
+    Quality = factor(
+      if_else(
+        str_detect(as.character(Key), "m"),
+        "Minor",
+        "Major"
+      ),
+      levels = c("Major", "Minor")
+    )
+  )
+
+
+top20 %>%
+  count(Quality)
+
+
+top20 %>%
+  filter(
+    Quality == "Minor",
+    !is.na(Rank_New)
+  ) %>%
+  arrange(Rank_New) %>%
+  select(Artist, Song, Key, Rank_New) %>%
+  slice(1)
 
 
